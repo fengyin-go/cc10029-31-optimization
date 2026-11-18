@@ -72,6 +72,41 @@
       </form>
     </div>
 
+    <section class="manifest-panel" data-testid="manifest-panel">
+      <header class="page-head">
+        <div>
+          <h3>归档批次清单</h3>
+          <p class="page-desc">读取分区计算快照生成的归档批次清单，清单区段与原落地记录一一对应。</p>
+        </div>
+      </header>
+      <form class="filter-bar" @submit.prevent="loadManifest">
+        <label class="filter-item">
+          <span>配置编号</span>
+          <input v-model="manifestConfig" data-testid="manifest-filter" placeholder="按配置编号检索，留空查全部" />
+        </label>
+        <button class="btn" data-testid="manifest-query" type="submit">查询清单</button>
+      </form>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th v-for="column in manifestColumns" :key="column">{{ column }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in manifestRows" :key="String(row['清单编号'])" data-testid="manifest-row">
+            <td v-for="column in manifestColumns" :key="column">{{ row[column] ?? '—' }}</td>
+          </tr>
+          <tr v-if="!manifestRows.length">
+            <td :colspan="manifestColumns.length" class="empty-state">暂无归档批次清单，可先在存储落地提交分区计算快照</td>
+          </tr>
+        </tbody>
+      </table>
+      <footer class="page-foot">
+        <span>共 {{ manifestTotal }} 行归档批次清单</span>
+        <span v-if="manifestError" class="error-text">{{ manifestError }}</span>
+      </footer>
+    </section>
+
     <footer class="page-foot">
       <span>共 {{ total }} 条历史归档记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -100,6 +135,11 @@ const filterFields = columns.slice(0, 3)
 const showCreate = ref(false)
 const creating = ref(false)
 const createValues = ref<Record<string, string>>({})
+const manifestColumns = ["清单编号", "配置编号", "快照编号", "批次开始", "批次结束", "区段", "保存天数", "配置来源", "校验结论", "配置冲突"]
+const manifestRows = ref<Row[]>([])
+const manifestTotal = ref(0)
+const manifestConfig = ref('')
+const manifestError = ref('')
 const stats = computed(() => [
   { label: metricNames[0], value: total.value },
   { label: metricNames[1], value: rows.value.filter((row) => row.status === statuses[1]).length },
@@ -168,6 +208,21 @@ async function runAction(action: string, row: Row) {
   }
 }
 
+async function loadManifest() {
+  manifestError.value = ''
+  const params = new URLSearchParams()
+  if (manifestConfig.value.trim()) params.set('配置编号', manifestConfig.value.trim())
+  try {
+    const response = await request(`${ENDPOINT}/manifest?${params.toString()}`)
+    if (!response.ok) throw new Error('归档批次清单读取失败')
+    const payload = await response.json()
+    manifestRows.value = payload.items ?? []
+    manifestTotal.value = payload.total ?? manifestRows.value.length
+  } catch (error) {
+    manifestError.value = error instanceof Error ? error.message : '归档批次清单读取失败'
+  }
+}
+
 async function reload() {
   errorMessage.value = ''
   const query = new URLSearchParams(filters.value as Record<string, string>).toString()
@@ -184,5 +239,14 @@ async function reload() {
   }
 }
 
-onMounted(reload)
+onMounted(() => {
+  void reload()
+  void loadManifest()
+})
 </script>
+
+<style scoped>
+.manifest-panel { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 4px; }
+.manifest-panel h3 { margin: 0; }
+</style>
+

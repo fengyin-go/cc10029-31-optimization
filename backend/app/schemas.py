@@ -35,6 +35,14 @@ class ActionPayload(BaseModel):
     remark: str | None = None
 
 
+class PartitionSnapshotPayload(BaseModel):
+    """送交分区计算快照的载荷：批次边界 + 保留配置来源（冻结版/最新版）。"""
+
+    批次开始: str
+    批次结束: str
+    版本模式: str = "冻结版"
+
+
 
 class TargetsiteEntry(BaseModel):
     """目标站点明细结构。"""
